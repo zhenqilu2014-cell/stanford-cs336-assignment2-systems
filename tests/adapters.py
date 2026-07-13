@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import torch
-
+import torch.distributed as dist
+from cs336_systems.ddp import DDPNaive, DDPOverlap
+from cs336_systems.optimizer_sharding import OptimizerSharding
+from cs336_systems.fsdp import FSDP
 
 
 def get_flashattention_autograd_function_pytorch() -> type:
@@ -51,7 +54,7 @@ def get_ddp(module: torch.nn.Module) -> torch.nn.Module:
         Instance of a DDP class.
     """
     # For example: return DDP(module)
-    raise NotImplementedError
+    return DDPOverlap(module)
 
 
 def ddp_on_after_backward(ddp_model: torch.nn.Module, optimizer: torch.optim.Optimizer):
@@ -66,7 +69,7 @@ def ddp_on_after_backward(ddp_model: torch.nn.Module, optimizer: torch.optim.Opt
             Optimizer being used with the DDP-wrapped model.
     """
     # For example: ddp_model.finish_gradient_synchronization()
-    raise NotImplementedError
+    return ddp_model.finish_gradient_synchronization()
 
 
 def get_fsdp(module: torch.nn.Module, compute_dtype: torch.dtype | None = None) -> torch.nn.Module:
@@ -85,7 +88,7 @@ def get_fsdp(module: torch.nn.Module, compute_dtype: torch.dtype | None = None) 
         Instance of an FSDP class.
     """
     # For example: return FSDP(module, compute_dtype=compute_dtype)
-    raise NotImplementedError
+    return FSDP(module, compute_dtype=compute_dtype)
 
 
 def fsdp_on_after_backward(fsdp_model: torch.nn.Module, optimizer: torch.optim.Optimizer):
@@ -100,7 +103,7 @@ def fsdp_on_after_backward(fsdp_model: torch.nn.Module, optimizer: torch.optim.O
             Optimizer being used with the FSDP-wrapped model.
     """
     # For example: fsdp_model.finish_gradient_synchronization()
-    raise NotImplementedError
+    return fsdp_model.finish_gradient_synchronization()
 
 
 def fsdp_gather_full_params(fsdp_model: torch.nn.Module) -> dict[str, torch.Tensor]:
@@ -114,7 +117,17 @@ def fsdp_gather_full_params(fsdp_model: torch.nn.Module) -> dict[str, torch.Tens
     Returns:
         State dictionary mapping parameter names to full (unsharded) tensors.
     """
-    raise NotImplementedError
+    state = dict()
+    for module_name, submodule in fsdp_model.module.named_modules():
+        if submodule in fsdp_model.sharded_modules:
+            for param_name, param in submodule.named_parameters():
+                gathered_list = [torch.zeros_like(param.data) for _ in range(fsdp_model.world_size)]
+                dist.all_gather(gathered_list, param.data, async_op=False)
+                state[f"{module_name}.{param_name}"] = torch.cat(gathered_list, dim=0)
+        elif hasattr(submodule, 'weight'):
+            for param_name, param in submodule.named_parameters():
+                state[f"{module_name}.{param_name}"] = param.data
+    return state
 
 
 def get_sharded_optimizer(params, optimizer_cls: type[torch.optim.Optimizer], **kwargs) -> torch.optim.Optimizer:
@@ -133,4 +146,4 @@ def get_sharded_optimizer(params, optimizer_cls: type[torch.optim.Optimizer], **
     Returns:
         Instance of sharded optimizer.
     """
-    raise NotImplementedError
+    return OptimizerSharding(params, optimizer_cls, **kwargs)
