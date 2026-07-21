@@ -63,3 +63,20 @@ To submit, run `./test_and_make_submission.sh` . This script will install your
 code's dependencies, run tests, and create a gzipped tarball with the output. We
 should be able to unzip your submitted tarball and run
 `./test_and_make_submission.sh` to verify your test results.
+
+## My Contributions
+
+This assignment involved implementing and benchmarking optimized distributed training components for a Transformer language model.
+
+### Profiling & Benchmarking
+- `cs336_systems/benchmark.py` — Profiling benchmarks to measure training performance across different model configurations.
+- `cs336_systems/benchmark.ipynb` — Companion notebook for interactive benchmarking.
+
+### Distributed Training
+- `cs336_systems/ddp.py` — Distributed Data Parallel (DDP) with multi-GPU gradient synchronization.
+- `cs336_systems/ddp_benchmark.ipynb` — Benchmarking notebook for DDP training runs.
+- `cs336_systems/fsdp.py` — Fully Sharded Data Parallel (FSDP) for reduced per-GPU memory.
+- `cs336_systems/optimizer_sharding.py` — Optimizer state sharding across devices.
+
+### Test Adapters
+- `tests/adapters.py` — Updated test adapters to integrate with the new distributed training implementations.
